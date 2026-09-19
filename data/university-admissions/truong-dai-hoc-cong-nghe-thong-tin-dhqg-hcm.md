@@ -4,7 +4,7 @@ title: Trường Đại học Công nghệ Thông tin ĐHQG-HCM
 source_url: https://tuyensinh.uit.edu.vn/truong-dai-hoc-cong-nghe-thong-tin-dhqg-hcm
 retrieved_at: 2026-09-19
 document_version: 2025
-audience: student
+audience: public
 department: university
 category: university
 language: vi

@@ -1,146 +1,116 @@
 # Báo Cáo Nhóm — Lab 7: Embedding & Vector Store
 
-**Nhóm:** [Tên nhóm]
-**Thành viên:** [Họ tên từng thành viên]
-**Ngày:** [Ngày nộp]
-
-> **Nộp 1 bản / nhóm.** Phần cá nhân (hướng tiếp cận, kết quả riêng, dự đoán…) mỗi thành viên nộp riêng trong `REPORT_CANHAN.md`. Chi tiết thang điểm: `docs/SCORING.md`.
-
-**Tổng điểm phần nhóm: 40** = Lựa chọn tài liệu (10) + Thiết kế chiến lược (15) + Chất lượng truy xuất (10) + Thuyết trình (5).
-
----
+**Nhóm:** Alone
+**Thành viên:** Nguyễn Thanh Phong
+**Ngày:** 19/9/2026
 
 ## 1. Lựa chọn tài liệu (Document Set Quality) — Nhóm (10 điểm)
 
 ### Chủ đề (Domain) & Lý Do Chọn
 
-**Chủ đề:** [ví dụ: Customer support FAQ, Luật Việt Nam, công thức nấu ăn, ...]
+**Chủ đề:** Tuyển sinh đại học tại Trường Đại học Công nghệ Thông tin, ĐHQG-HCM (UIT).
 
-**Tại sao nhóm chọn chủ đề này?**
-> *Viết 2-3 câu:*
+Corpus dùng các trang tuyển sinh công khai của UIT, gồm quy chế/phương thức tuyển sinh và mô tả các ngành. Chủ đề có các câu hỏi định lượng, điều kiện, quy trình và lựa chọn học tập; vì vậy phù hợp để kiểm tra semantic retrieval lẫn metadata filtering.
 
 ### Danh sách tài liệu (Data Inventory)
 
-| # | Tên tài liệu | Nguồn (Source URL) | Ngày lấy / Phiên bản | Số ký tự | Metadata đã gán |
-|---|--------------|------------|--------------------|----------|-----------------|
-| 1 | | | | | |
-| 2 | | | | | |
-| 3 | | | | | |
-| 4 | | | | | |
-| 5 | | | | | |
+| # | Tên tài liệu | Nguồn | Ngày / phiên bản | Số ký tự | Metadata |
+|---|---|---|---|---:|---|
+| 1 | Phương thức tuyển sinh 2025 | `tuyensinh.uit.edu.vn/2025-phuong-thuc-tuyen-sinh-nam-2025` | 19/9/2026 / 2025 | 19,079 | source_url, retrieved_at, document_version, audience=student |
+| 2 | Khoa học Máy tính | `tuyensinh.uit.edu.vn/nganh-dao-tao/nganh-khoa-hoc-may-tinh` | 19/9/2026 / 2025 | 12,118 | source_url, retrieved_at, document_version, audience=student |
+| 3 | Kỹ thuật Máy tính | `tuyensinh.uit.edu.vn/nganh-dao-tao/nganh-ky-thuat-may-tinh` | 19/9/2026 / 2025 | 11,089 | source_url, retrieved_at, document_version, audience=student |
+| 4 | KHMT liên kết quốc tế | `tuyensinh.uit.edu.vn/nganh-dao-tao/nganh-khoa-hoc-may-tinh-chuong-trinh-lien-ket-quoc-te` | 19/9/2026 / 2025 | 9,665 | source_url, retrieved_at, document_version, audience=student |
+| 5 | Thiết kế vi mạch | `tuyensinh.uit.edu.vn/nganh-dao-tao/nganh-thiet-ke-vi-mach` | 19/9/2026 / 2025 | 6,564 | source_url, retrieved_at, document_version, audience=student |
+| 6 | Giới thiệu UIT | `tuyensinh.uit.edu.vn/truong-dai-hoc-cong-nghe-thong-tin-dhqg-hcm` | 19/9/2026 / 2025 | 13,200 | source_url, retrieved_at, document_version, audience=public |
 
-**Danh sách kiểm tra quản trị dữ liệu (Data governance checklist):**
-- [ ] Tập tài liệu (Corpus) chỉ chứa nguồn công khai/được phép dùng và không chứa dữ liệu cá nhân, thông tin đăng nhập hoặc tài liệu nội bộ.
-- [ ] Mỗi tài liệu có `source_url`, `retrieved_at`, `document_version` (hoặc ngày hiệu lực) trong metadata.
+- [x] Corpus chỉ dùng nguồn công khai của UIT; không có dữ liệu cá nhân, thông tin đăng nhập hoặc tài liệu nội bộ.
+- [x] Mỗi tài liệu có `source_url`, `retrieved_at`, `document_version` và `audience` trong frontmatter.
 
-### Cấu trúc Metadata (Metadata Schema)
+### Cấu trúc Metadata
 
-| Trường metadata | Kiểu | Ví dụ giá trị | Tại sao hữu ích cho truy xuất (retrieval)? |
-|----------------|------|---------------|-------------------------------|
-| | | | |
-| | | | |
-
----
+| Trường | Kiểu | Ví dụ | Mục đích |
+|---|---|---|---|
+| `doc_id` | string | `nganh-ky-thuat-may-tinh` | Liên kết chunks với file gốc, phục vụ traceability và delete. |
+| `source_url` | string | URL tuyển sinh UIT | Kiểm chứng nguồn trả lời. |
+| `retrieved_at` | date | `2026-09-19` | Biết thời điểm thu thập. |
+| `document_version` | string | `2025` | Phân biệt quy định theo năm. |
+| `audience` | string | `student`, `public` | Lọc ứng viên trước similarity search. |
+| `chunk_index` | integer | `13` | Truy vết chunk trong file. |
 
 ## 2. Thiết kế chiến lược (Strategy Design) — Nhóm (15 điểm)
 
-> Mỗi thành viên thử **một chiến lược khác nhau** trên cùng bộ tài liệu; nhóm tổng hợp và so sánh ở đây.
-
 ### Phân tích đường cơ sở (Baseline Analysis)
 
-Chạy `ChunkingStrategyComparator().compare()` trên 2-3 tài liệu:
+Frontmatter đã được bỏ trước khi đo. Các giá trị là kết quả `ChunkingStrategyComparator().compare()` với tham số mặc định.
 
-| Tài liệu | Chiến lược (Strategy) | Số lượng Chunk | Độ dài trung bình | Giữ được ngữ cảnh không? |
-|-----------|----------|-------------|------------|-------------------|
-| | FixedSizeChunker (`fixed_size`) | | | |
-| | SentenceChunker (`by_sentences`) | | | |
-| | RecursiveChunker (`recursive`) | | | |
+| Tài liệu | Chiến lược | Số chunks | Độ dài TB | Giữ ngữ cảnh? |
+|---|---|---:|---:|---|
+| Phương thức tuyển sinh 2025 | Fixed size | 74 | 199.0 | Trung bình; có thể cắt giữa điều kiện. |
+| Phương thức tuyển sinh 2025 | Sentence | 44 | 332.0 | Tốt theo câu, nhưng danh sách dài bị dồn. |
+| Phương thức tuyển sinh 2025 | Recursive | 94 | 152.7 | Tốt ở đoạn ngắn, nhiều chunks. |
+| Kỹ thuật Máy tính | Fixed size | 43 | 196.7 | Trung bình. |
+| Kỹ thuật Máy tính | Sentence | 15 | 561.9 | Tốt nhưng chunk dài. |
+| Kỹ thuật Máy tính | Recursive | 55 | 151.5 | Tốt ở các đoạn. |
+| KHMT liên kết quốc tế | Fixed size | 37 | 197.3 | Trung bình. |
+| KHMT liên kết quốc tế | Sentence | 15 | 485.9 | Tốt nhưng chunk dài. |
+| KHMT liên kết quốc tế | Recursive | 48 | 149.6 | Tốt ở các đoạn. |
 
-### Chiến lược của từng thành viên
+### Chiến lược của thành viên
 
-> Mỗi thành viên điền một khối dưới đây (copy thêm nếu nhóm có nhiều hơn 3 người).
+**Nguyễn Thanh Phong — HeadingChunker (custom)**
 
-**Thành viên 1 — [Tên]**
-- **Loại chiến lược:** [FixedSize / Sentence / Recursive / custom]
-- **Mô tả & lý do chọn cho chủ đề này:** *(2-3 câu)*
-- **Code snippet (nếu custom):**
-```python
-# Dán mã nguồn (implementation) vào đây
-```
+- **Loại chiến lược:** Tách theo heading Markdown/heading viết hoa, `chunk_size=800`; section quá dài được cắt tiếp bằng `RecursiveChunker`.
+- **Lý do chọn:** Các trang quy định đã được biên soạn theo mục. Giữ từng mục làm đơn vị trước giúp điều kiện và tiêu đề đi cùng nhau; khi cắt nhỏ, tiêu đề được gắn lại vào từng mảnh để giữ ngữ cảnh.
+- **Kết quả nạp:** 118 chunks; embeddings dùng `text-embedding-3-small`; agent dùng gateway `cx/gpt-5.5` và trích dẫn số chunk.
 
-**Thành viên 2 — [Tên]**
-- **Loại chiến lược:**
-- **Mô tả & lý do chọn:**
-- **Code snippet (nếu custom):**
+### So sánh và nhận xét
 
-**Thành viên 3 — [Tên]**
-- **Loại chiến lược:**
-- **Mô tả & lý do chọn:**
-- **Code snippet (nếu custom):**
-
-### So Sánh Giữa Các Thành Viên
-
-| Thành viên | Chiến lược (Strategy) | Điểm truy xuất (/10) | Điểm mạnh | Điểm yếu |
-|-----------|----------|----------------------|-----------|----------|
-| | | | | |
-| | | | | |
-| | | | | |
-
-**Chiến lược nào tốt nhất cho chủ đề này? Tại sao?**
-> *Viết 2-3 câu — đây là phần được đánh giá cao nhất (khả năng suy nghĩ & giải thích):*
-
----
+HeadingChunker phù hợp nhất với corpus quy định vì tôn trọng cấu trúc có sẵn của tác giả. Khi section dài, hạ xuống RecursiveChunker cân bằng ngữ cảnh section và giới hạn kích thước. Hạn chế thấy ở câu 5: chunk về thời lượng/địa điểm chưa vào top-3, nên cần tinh chỉnh heading cleanup hoặc query expansion.
 
 ## 3. Câu hỏi đánh giá & Chất lượng truy xuất (Retrieval Quality) — Nhóm (10 điểm)
 
-### Câu hỏi đánh giá & Câu trả lời chuẩn (nhóm thống nhất)
+### Câu hỏi đánh giá & Câu trả lời chuẩn
 
-> **Đúng 5 câu hỏi**, đa dạng, có thể kiểm chứng; **ít nhất 1 câu** cần lọc metadata mới trả lời tốt. Đây là bộ câu hỏi chung cho mọi thành viên chạy.
+| # | Câu hỏi | Gold answer | Chunk chứa thông tin |
+|---|---|---|---|
+| 1 | Ngưỡng đầu vào THPT 2025 và yêu cầu riêng Thiết kế vi mạch? | 22 điểm; riêng Thiết kế vi mạch cần Toán >= 6.5. | `2025-phuong-thuc-tuyen-sinh-nam-2025#13` |
+| 2 | Điều kiện điểm SAT theo chứng chỉ quốc tế? | SAT >= 1200, mỗi môn >= 600. | `2025-phuong-thuc-tuyen-sinh-nam-2025#7` |
+| 3 | Thí sinh đạt giải cao đăng ký thông tin khi nào? | 27/6/2025 đến hết 28/7/2025. | `2025-phuong-thuc-tuyen-sinh-nam-2025#6` |
+| 4 | Kỹ thuật Máy tính có hai hướng chuyên sâu nào? | Thiết kế vi mạch và phần cứng; Hệ thống nhúng và Robot. | `nganh-ky-thuat-may-tinh#4` |
+| 5 | KHMT liên kết quốc tế kéo dài bao lâu và học ở đâu? | 3.5 năm; giai đoạn 1 học UIT, giai đoạn 2 học UIT hoặc chuyển tiếp Birmingham City University. | `nganh-khoa-hoc-may-tinh-chuong-trinh-lien-ket-quoc-te#12` |
 
-| # | Câu hỏi (Query) | Câu trả lời chuẩn (Gold Answer) | Chunk nào chứa thông tin? |
-|---|-------|-------------------------------|--------------------------|
-| 1 | | | |
-| 2 | | | |
-| 3 | | | |
-| 4 | | | |
-| 5 | | | |
+### Tổng hợp chất lượng truy xuất
 
-### Tổng hợp chất lượng truy xuất của nhóm
+Kết quả chạy `python bench.py`: OpenAI `text-embedding-3-small`, 118 chunks, top-k=3; agent dùng gateway `cx/gpt-5.5`.
 
-> Cách chấm (theo `docs/SCORING.md`): **2 điểm/câu** — top-3 chứa chunk liên quan + agent trả lời đúng (2), có liên quan nhưng thiếu/không ở top-1 (1), không có trong top-3 (0).
+| # | Câu hỏi | Chunk liên quan trong top-3? | Kết quả agent | Điểm |
+|---|---|---|---|---:|
+| 1 | Ngưỡng THPT + Vi mạch | Có, top-1 (0.686) | Đúng đầy đủ | 2/2 |
+| 2 | Điều kiện SAT | Có, top-3 (0.585) | Đúng: SAT >= 1200, mỗi môn >= 600 | 2/2 |
+| 3 | Thời gian đăng ký | Có, top-1 (0.586) | Đúng | 2/2 |
+| 4 | Hai hướng KTMT | Có, top-1 (0.600) | Đúng | 2/2 |
+| 5 | Liên kết quốc tế | Không; top-1 cùng tài liệu (0.612) nhưng thiếu dữ kiện | Báo không đủ ngữ cảnh, không bịa | 0/2 |
 
-| # | Câu hỏi | Chiến lược tốt nhất cho câu này | Có chunk liên quan trong top-3? | Ghi chú |
-|---|---------|-------------------------------|-------------------------------|---------|
-| 1 | | | | |
-| 2 | | | | |
-| 3 | | | | |
-| 4 | | | | |
-| 5 | | | | |
-
-**Lọc bằng metadata có giúp ích không? Ở câu hỏi nào?**
-> *Viết 2-3 câu:*
-
----
+**Lọc bằng metadata có giúp ích không?** Query 5 chạy với `metadata_filter={"audience": "student"}`. Filter thực hiện trước similarity search và loại tài liệu giới thiệu chung `audience=public`; tuy nhiên riêng query này vẫn cần cải thiện ranking để chunk thời lượng/địa điểm vào top-3. Filter thu hẹp đúng tập ứng viên nhưng không thay thế chất lượng chunk/query.
 
 ## 4. Thuyết trình (Demo) & Bài học nhóm — Nhóm (5 điểm)
 
-**Những phân tích (insights) hay nhất nhóm sẽ trình bày:**
-> *Liệt kê 2-3 ý:*
+**Các insights trình bày:**
 
-**Bài học rút ra khi so sánh trong nhóm:**
-> *Viết 2-3 câu — cùng tài liệu nhưng chiến lược khác nhau dẫn tới khác biệt gì?*
+- Chunk theo heading giữ điều kiện tuyển sinh và tiêu đề mục đi cùng nhau; heading được nối lại khi section bị cắt nhỏ.
+- Metadata phải được truyền vào mọi chunk; nếu lọc sau top-k có thể bỏ hết kết quả hợp lệ.
+- Grounded prompt đánh số `[1]`, `[2]`, `[3]` giúp truy vết câu trả lời về đúng chunk/nguồn.
 
-**Nếu làm lại, nhóm sẽ thay đổi gì trong chiến lược dữ liệu (data strategy)?**
-> *Viết 2-3 câu:*
+**Bài học rút ra:** Cùng corpus nhưng strategy khác thay đổi sự cân bằng giữa kích thước chunk và độ đầy đủ thông tin. Trường hợp câu 5 chứng minh agent từ chối khi thiếu context an toàn hơn tạo đáp án không có nguồn.
 
----
+**Nếu làm lại:** Chuẩn hóa heading từ HTML sạch hơn, bổ sung query expansion cho “thời lượng”, “địa điểm học”, và thêm cache embedding theo hash nội dung để chạy benchmark lặp lại nhanh hơn.
 
 ## Tự Đánh Giá (Phần Nhóm)
 
 | Tiêu chí | Điểm tự đánh giá |
-|----------|-------------------|
-| Lựa chọn tài liệu (Document Set Quality) | / 10 |
-| Thiết kế chiến lược (Strategy Design) | / 15 |
-| Chất lượng truy xuất (Retrieval Quality) | / 10 |
-| Thuyết trình (Demo) | / 5 |
-| **Tổng phần nhóm** | **/ 40** |
+|---|---:|
+| Lựa chọn tài liệu | 10 / 10 |
+| Thiết kế chiến lược | 15 / 15 |
+| Chất lượng truy xuất | 8 / 10 |
+| Thuyết trình (Demo) & bài học | 4 / 5 |
+| **Tổng phần nhóm** | **37 / 40** |

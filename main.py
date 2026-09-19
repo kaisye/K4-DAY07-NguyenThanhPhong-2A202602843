@@ -13,6 +13,7 @@ from src.embeddings import (
     LOCAL_EMBEDDING_MODEL,
     OPENAI_EMBEDDING_MODEL,
     GeminiEmbedder,
+    GatewayChat,
     LocalEmbedder,
     OpenAIEmbedder,
     _mock_embed,
@@ -119,7 +120,11 @@ def run_manual_demo(question: str | None = None, sample_files: list[str] | None 
         print(f"   content preview: {result['content'][:120].replace(chr(10), ' ')}...")
 
     print("\n=== KnowledgeBaseAgent Test ===")
-    agent = KnowledgeBaseAgent(store=store, llm_fn=demo_llm)
+    # The local gateway is OpenAI-compatible and uses cx/gpt-5.5.  Keep the
+    # demo callable available only when explicitly requested for offline use.
+    llm_fn = demo_llm if os.getenv("LLM_PROVIDER", "gateway").lower() == "demo" else GatewayChat()
+    print(f"\nAnswer backend: {getattr(llm_fn, '_backend_name', 'demo LLM')}")
+    agent = KnowledgeBaseAgent(store=store, llm_fn=llm_fn)
     print(f"Question: {query}")
     print("Agent answer:")
     print(agent.answer(query, top_k=3))

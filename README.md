@@ -105,6 +105,46 @@ PY
 export GEMINI_EMBEDDING_MODEL=gemini-embedding-001
 ```
 
+### 5) Tùy chọn: NVIDIA NIM embeddings
+
+`bench.py` tự động sử dụng NVIDIA khi biến `NVIDIA_API_KEY` được đặt và không
+có `OPENAI_API_KEY`. NVIDIA NIM `nvidia/nemotron-3-embed-1b` tạo embeddings.
+
+```bash
+export NVIDIA_API_KEY=your-nvidia-api-key
+python3 bench.py
+```
+
+Tạo key tại NVIDIA Build. Khi không có key, `bench.py` vẫn chạy bằng mock
+embedder.
+
+### Chạy benchmark với OpenAI embeddings
+
+Khi `OPENAI_API_KEY` được đặt, `bench.py` ưu tiên dùng
+`text-embedding-3-small` thay cho mock/NVIDIA embeddings.
+
+```bash
+python3 -m pip install openai
+export OPENAI_API_KEY=your-openai-api-key
+python3 bench.py
+```
+
+### 6) Gateway cục bộ cho câu trả lời RAG
+
+`main.py` và `bench.py` dùng gateway OpenAI-compatible cục bộ mặc định để tạo
+câu trả lời grounded: `http://127.0.0.1:20128/v1`, model `cx/gpt-5.5`. Gateway
+được tách riêng khỏi OpenAI embedder; vì vậy `OPENAI_API_KEY` chỉ dùng cho
+embeddings.
+
+```bash
+python3 -m pip install -r requirements.txt
+python3 main.py "Chunking là gì?"
+python3 bench.py
+```
+
+Nếu gateway yêu cầu khóa, đặt `GATEWAY_API_KEY`. Để chạy thủ công không gọi
+LLM, dùng `LLM_PROVIDER=demo python3 main.py "Chunking là gì?"`.
+
 ### Quy tắc dự phòng (fallback)
 
 - Nếu không chọn gì, lab mặc định dùng `_mock_embed`
